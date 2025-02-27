@@ -1,8 +1,23 @@
+# Environment variables
 .env
+.env.local
+
+# Python
 __pycache__/
-*.pyc
-.idea/
-.vscode/
-*.log
+*.py[cod]
+*$py.class
+
+# Virtual Environment
 venv/
 env/
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+temp_*
+*.tmp
+
+# Logs
+*.log
