@@ -122,6 +122,10 @@ def generate_summary(articles: list, query: str, target_lang: str) -> str:
         error_message = "Une erreur s'est produite lors de la génération du résumé."
         return translate_text(error_message, target_lang)
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse(
