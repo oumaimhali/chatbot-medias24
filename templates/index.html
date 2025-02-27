@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Médias24 ChatBot</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .chat-container {
+            height: calc(100vh - 200px);
+        }
+        .message {
+            max-width: 80%;
+            margin: 10px;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: auto;
+        }
+        .bot-message {
+            background-color: #f5f5f5;
+            margin-right: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Logos -->
+        <div class="flex justify-between items-center mb-8">
+            <img src="https://assets.medias24.com/images/CAN2025/logos/10518719-intelligence-artificielle-ai-processeur-puce-vecteur-icone-symbole-pour-la-conception-graphique-logo-site-web-social-media-mobile-app-ui-illustration-vectoriel.jpg" 
+                 alt="AI Logo" class="h-16">
+            <img src="https://assets.medias24.com/images/CAN2025/JOUEURS/GENERAL/logo_medias24.jpeg" 
+                 alt="Médias24 Logo" class="h-16">
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <div id="chat-messages" class="chat-container overflow-y-auto mb-6">
+                <div class="bot-message message">
+                    Bonjour ! Je suis l'assistant Médias24. Comment puis-je vous aider aujourd'hui ?
+                </div>
+            </div>
+
+            <!-- Input Controls -->
+            <div class="space-y-4">
+                <!-- Language Selection -->
+                <div class="flex space-x-4">
+                    <select id="language" class="flex-1 p-2 border rounded">
+                        <option value="fr">Français</option>
+                        <option value="en">English</option>
+                        <option value="ar">العربية</option>
+                        <option value="es">Español</option>
+                    </select>
+                    
+                    <!-- Date Range -->
+                    <input type="date" id="start-date" class="p-2 border rounded" placeholder="Date début">
+                    <input type="date" id="end-date" class="p-2 border rounded" placeholder="Date fin">
+                </div>
+
+                <!-- Voice Input -->
+                <div class="flex space-x-4">
+                    <button id="start-recording" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        🎤 Enregistrer
+                    </button>
+                    <button id="stop-recording" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600" style="display: none;">
+                        ⏹ Arrêter
+                    </button>
+                </div>
+
+                <!-- Text Input -->
+                <div class="flex space-x-4">
+                    <input type="text" id="user-input" class="flex-1 p-2 border rounded" 
+                           placeholder="Posez votre question...">
+                    <button id="send-button" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">
+                        Envoyer
+                    </button>
+                </div>
+
+                <!-- Feedback -->
+                <div class="mt-4">
+                    <textarea id="feedback" class="w-full p-2 border rounded" 
+                            placeholder="Donnez-nous votre avis..."></textarea>
+                    <button id="send-feedback" class="mt-2 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                        Envoyer le feedback
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+
+        document.getElementById('start-recording').addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob);
+
+                    try {
+                        const response = await fetch('/upload-audio', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await response.json();
+                        document.getElementById('user-input').value = data.text;
+                    } catch (error) {
+                        console.error('Error uploading audio:', error);
+                    }
+
+                    audioChunks = [];
+                };
+
+                mediaRecorder.start();
+                document.getElementById('start-recording').style.display = 'none';
+                document.getElementById('stop-recording').style.display = 'block';
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+            }
+        });
+
+        document.getElementById('stop-recording').addEventListener('click', () => {
+            mediaRecorder.stop();
+            document.getElementById('start-recording').style.display = 'block';
+            document.getElementById('stop-recording').style.display = 'none';
+        });
+
+        document.getElementById('send-button').addEventListener('click', async () => {
+            const query = document.getElementById('user-input').value;
+            const language = document.getElementById('language').value;
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+
+            if (!query) return;
+
+            // Add user message
+            addMessage(query, 'user');
+            document.getElementById('user-input').value = '';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query,
+                        target_language: language,
+                        start_date: startDate,
+                        end_date: endDate
+                    })
+                });
+
+                const data = await response.json();
+                addMessage(data.response, 'bot');
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('Désolé, une erreur s\'est produite.', 'bot');
+            }
+        });
+
+        document.getElementById('send-feedback').addEventListener('click', async () => {
+            const feedback = document.getElementById('feedback').value;
+            if (!feedback) return;
+
+            try {
+                await fetch('/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `feedback=${encodeURIComponent(feedback)}`
+                });
+                document.getElementById('feedback').value = '';
+                alert('Merci pour votre feedback !');
+            } catch (error) {
+                console.error('Error sending feedback:', error);
+            }
+        });
+
+        function addMessage(text, sender) {
+            const messagesDiv = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.textContent = text;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Enter key handler
+        document.getElementById('user-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('send-button').click();
+            }
+        });
+    </script>
+</body>
+</html>
