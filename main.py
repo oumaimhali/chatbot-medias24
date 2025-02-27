@@ -1,7 +1,7 @@
-from fastapi import FastAPI, Request, Form, UploadFile, File
+from fastapi import FastAPI, Request, Form, UploadFile, File, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from elasticsearch import Elasticsearch
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -124,7 +124,18 @@ def generate_summary(articles: list, query: str, target_lang: str) -> str:
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    try:
+        # Vérification de base
+        health_status = {
+            "status": "healthy",
+            "timestamp": "up",
+        }
+        return JSONResponse(content=health_status, status_code=200)
+    except Exception as e:
+        return JSONResponse(
+            content={"status": "unhealthy", "error": str(e)},
+            status_code=500
+        )
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
